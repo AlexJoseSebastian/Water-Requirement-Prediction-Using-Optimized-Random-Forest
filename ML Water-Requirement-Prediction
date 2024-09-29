@@ -1,0 +1,53 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, r2_score
+import numpy as np
+
+data = pd.read_csv('dataset.csv')
+
+label_encoders = {}
+for column in ['CROP TYPE', 'SOIL TYPE', 'REGION', 'WEATHER CONDITION']:
+    le = LabelEncoder()
+    data[column] = le.fit_transform(data[column])
+    label_encoders[column] = le
+
+def temp_to_range(temp_str):
+    temp_values = temp_str.split('-')
+    if len(temp_values) == 1:
+        return float(temp_values[0])
+    return (float(temp_values[0]) + float(temp_values[1])) / 2
+
+data['TEMPERATURE RANGE'] = data['TEMPERATURE RANGE'].apply(temp_to_range)
+
+X = data[['CROP TYPE', 'SOIL TYPE', 'REGION', 'TEMPERATURE RANGE', 'WEATHER CONDITION']]
+y = data['WATER REQUIREMENT']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+def predict_water_requirement(crop_type, soil_type, region, temp_range, weather_condition):
+    input_data = pd.DataFrame({
+        'CROP TYPE': [label_encoders['CROP TYPE'].transform([crop_type])[0]],
+        'SOIL TYPE': [label_encoders['SOIL TYPE'].transform([soil_type])[0]],
+        'REGION': [label_encoders['REGION'].transform([region])[0]],
+        'TEMPERATURE RANGE': [temp_to_range(temp_range)],
+        'WEATHER CONDITION': [label_encoders['WEATHER CONDITION'].transform([weather_condition])[0]]
+    })
+    return model.predict(input_data)[0]
+
+crop_type = input("Enter Crop Type: ")
+soil_type = input("Enter Soil Type: ")
+region = input("Enter Region: ")
+temp_range = input("Enter Temperature Range (e.g., 20-30): ")
+weather_condition = input("Enter Weather Condition: ")
+
+water_requirement = predict_water_requirement(crop_type, soil_type, region, temp_range, weather_condition)
+print(f"The predicted water requirement is: {water_requirement:.2f}")
+
+y_pred = model.predict(X_test)
+print("Mean Absolute Error:", mean_absolute_error(y_test, y_pred))
+print("R² Score:", r2_score(y_test, y_pred))
